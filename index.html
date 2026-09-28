@@ -158,11 +158,7 @@
 </header>
 
 <div class="tabs-bar">
-  <div class="tabs-inner">
-    <button class="tab-btn active" onclick="showTab(0,this)">Poule A</button>
-    <button class="tab-btn" onclick="showTab(1,this)">Poule B</button>
-    <button class="tab-btn" onclick="showTab(2,this)">Finales</button>
-  </div>
+  <div class="tabs-inner" id="tabs-inner"></div>
 </div>
 
 <div class="refresh-bar">
@@ -171,25 +167,63 @@
   <div class="refresh-dot" id="refresh-dot"></div>
 </div>
 
-<main>
-  <div id="tab-0" class="category-panel active"><div class="state-box"><div class="spinner"></div>Gegevens laden...</div></div>
-  <div id="tab-1" class="category-panel"><div class="state-box"><div class="spinner"></div>Gegevens laden...</div></div>
-  <div id="tab-2" class="category-panel"><div class="state-box"><div class="spinner"></div>Gegevens laden...</div></div>
-</main>
+<main id="main-panels"></main>
 
-<footer>Homenetmen Alkmaar Voetbaltoernooi 2026 &nbsp;·&nbsp; Alle rechten voorbehouden</footer>
+<footer>Homenetmen Alkmaae Voetbaltoernooi 2026 &nbsp;·&nbsp; Alle rechten voorbehouden</footer>
 <div class="footer-stripe"></div>
 
 <script>
-// ── CONFIG: paste your Google Sheets CSV export URLs here ────────────────────
-// Poule A: matches sheet  (columns: match, time, field, home, home_score, away_score, away)
-const POULE_A_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoXCBtfjtYXWuJIRktHJFQaq5U9tk7CW_8jH9SIgILqgav09UBzDmrRSOxHaBWbd7tvMgrDYn61y1g/pub?gid=1064256065&single=true&output=csv';
-// Poule B: matches sheet
-const POULE_B_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoXCBtfjtYXWuJIRktHJFQaq5U9tk7CW_8jH9SIgILqgav09UBzDmrRSOxHaBWbd7tvMgrDYn61y1g/pub?gid=704506464&single=true&output=csv';
-// Finales: results sheet (columns: round, time, field, home, home_score, away_score, away)
+// ══════════════════════════════════════════════════════════════════════════════
+// CONFIG — edit here only
+// Columns needed per poule sheet: match, time, field, home, home_score, away_score, away
+// Columns needed for finales sheet: round (or match), time, field, home, home_score, away_score, away, home_pen, away_pen
+// To add or remove a poule: add/remove an object in POULES. That's it.
+// ══════════════════════════════════════════════════════════════════════════════
+const POULES = [
+  { name: 'Poule A', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoXCBtfjtYXWuJIRktHJFQaq5U9tk7CW_8jH9SIgILqgav09UBzDmrRSOxHaBWbd7tvMgrDYn61y1g/pub?gid=1064256065&single=true&output=csv' },
+  { name: 'Poule B', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoXCBtfjtYXWuJIRktHJFQaq5U9tk7CW_8jH9SIgILqgav09UBzDmrRSOxHaBWbd7tvMgrDYn61y1g/pub?gid=704506464&single=true&output=csv' },
+  // { name: 'Poule C', url: 'PASTE_CSV_URL_HERE' },
+  // { name: 'Poule D', url: 'PASTE_CSV_URL_HERE' },
+];
 const FINALES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoXCBtfjtYXWuJIRktHJFQaq5U9tk7CW_8jH9SIgILqgav09UBzDmrRSOxHaBWbd7tvMgrDYn61y1g/pub?gid=837176918&single=true&output=csv';
-// ────────────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
 
+// ── BUILD TABS & PANELS FROM CONFIG ──────────────────────────────────────────
+(function buildShell() {
+  const tabsEl = document.getElementById('tabs-inner');
+  const mainEl = document.getElementById('main-panels');
+  const loading = '<div class="state-box"><div class="spinner"></div>Gegevens laden...</div>';
+
+  POULES.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = p.name;
+    btn.onclick = () => showTab(i, btn);
+    tabsEl.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.id = 'tab-' + i;
+    panel.className = 'category-panel' + (i === 0 ? ' active' : '');
+    panel.innerHTML = loading;
+    mainEl.appendChild(panel);
+  });
+
+  // Finales tab — always last
+  const finIdx = POULES.length;
+  const finBtn = document.createElement('button');
+  finBtn.className = 'tab-btn';
+  finBtn.textContent = 'Finales';
+  finBtn.onclick = () => showTab(finIdx, finBtn);
+  tabsEl.appendChild(finBtn);
+
+  const finPanel = document.createElement('div');
+  finPanel.id = 'tab-' + finIdx;
+  finPanel.className = 'category-panel';
+  finPanel.innerHTML = loading;
+  mainEl.appendChild(finPanel);
+})();
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
 function showTab(idx, btn) {
   document.querySelectorAll('.category-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -197,6 +231,7 @@ function showTab(idx, btn) {
   btn.classList.add('active');
 }
 
+// ── CSV PARSER ────────────────────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
@@ -209,12 +244,12 @@ function parseCSV(text) {
   });
 }
 
+// ── STANDINGS CALCULATOR ──────────────────────────────────────────────────────
 function calcStandings(matches) {
   const teams = {};
   const ensure = name => {
     if (!teams[name]) teams[name] = { name, p:0, w:0, d:0, l:0, gf:0, ga:0, pts:0 };
   };
-
   matches.forEach(m => {
     ensure(m.home); ensure(m.away);
     const hs = parseInt(m.home_score), as = parseInt(m.away_score);
@@ -226,7 +261,6 @@ function calcStandings(matches) {
     else if (hs < as) { teams[m.away].w++; teams[m.away].pts += 3; teams[m.home].l++; }
     else              { teams[m.home].d++; teams[m.home].pts++; teams[m.away].d++; teams[m.away].pts++; }
   });
-
   function h2hPts(teamNames) {
     const h2h = {};
     teamNames.forEach(n => h2h[n] = 0);
@@ -234,13 +268,12 @@ function calcStandings(matches) {
       if (!teamNames.includes(m.home) || !teamNames.includes(m.away)) return;
       const hs = parseInt(m.home_score), as = parseInt(m.away_score);
       if (isNaN(hs) || isNaN(as)) return;
-      if (hs > as)      { h2h[m.home] += 3; }
-      else if (hs < as) { h2h[m.away] += 3; }
-      else              { h2h[m.home]++; h2h[m.away]++; }
+      if (hs > as) h2h[m.home] += 3;
+      else if (hs < as) h2h[m.away] += 3;
+      else { h2h[m.home]++; h2h[m.away]++; }
     });
     return h2h;
   }
-
   const list = Object.values(teams);
   list.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
@@ -253,10 +286,10 @@ function calcStandings(matches) {
     const h2h = h2hPts(tiedNames);
     return h2h[b.name] - h2h[a.name];
   });
-
   return list;
 }
 
+// ── SCORE HTML ────────────────────────────────────────────────────────────────
 function scoreHTML(hs, as, isFinale) {
   const played = hs !== '' && as !== '' && !isNaN(parseInt(hs));
   if (isFinale) {
@@ -267,7 +300,7 @@ function scoreHTML(hs, as, isFinale) {
   return `<div class="score-box pending"><div class="score-num">–</div><span class="score-dash"></span><div class="score-num">–</div></div>`;
 }
 
-// ── POULE PANEL (A or B) ─────────────────────────────────────────────────────
+// ── POULE PANEL BUILDER ───────────────────────────────────────────────────────
 function buildPoulePanel(matches, pouleName) {
   const matchRows = matches.map(m => `
     <div class="match-item">
@@ -309,7 +342,7 @@ function buildPoulePanel(matches, pouleName) {
     </div>`;
 }
 
-// ── FINALES PANEL ────────────────────────────────────────────────────────────
+// ── FINALES PANEL BUILDER ─────────────────────────────────────────────────────
 function buildFinalesPanel(matches) {
   if (!matches.length) return '<div class="state-box">Geen finales gevonden in het spreadsheet.</div>';
 
@@ -336,9 +369,7 @@ function buildFinalesPanel(matches) {
         : penLine || `<div class="finale-info">Gelijkspel</div>`;
     }
 
-    // Use 'round' column if available, otherwise fall back to 'match'
     const roundLabel = m.round || m.match || 'Finale';
-
     return `
       <div class="finale-card">
         <div class="finale-label">★ ${roundLabel} — Veld ${m.field || '–'} &nbsp;|&nbsp; ${m.time || '–'}</div>
@@ -356,38 +387,40 @@ function buildFinalesPanel(matches) {
     <div class="finales-grid">${cards}</div>`;
 }
 
-// ── DATA LOADING ─────────────────────────────────────────────────────────────
+// ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function fetchCSV(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return parseCSV(await res.text());
 }
 
-async function loadPoule(tabId, url, name) {
-  if (!url || url.startsWith('PASTE_')) {
-    document.getElementById(tabId).innerHTML = `<div class="state-box">⚙️ Voeg de CSV-URL in voor <strong>${name}</strong>.</div>`;
+async function loadPoule(idx, poule) {
+  const tabId = 'tab-' + idx;
+  if (!poule.url || poule.url.startsWith('PASTE_')) {
+    document.getElementById(tabId).innerHTML = `<div class="state-box">⚙️ Voeg de CSV-URL in voor <strong>${poule.name}</strong>.</div>`;
     return;
   }
   try {
-    const matches = await fetchCSV(url);
+    const matches = await fetchCSV(poule.url);
     if (!matches.length) throw new Error('Geen rijen gevonden — controleer de kolomnamen');
-    document.getElementById(tabId).innerHTML = buildPoulePanel(matches, name);
+    document.getElementById(tabId).innerHTML = buildPoulePanel(matches, poule.name);
   } catch (e) {
-    document.getElementById(tabId).innerHTML = `<div class="state-box">❌ Laden mislukt voor <strong>${name}</strong>.<br><small>${e.message}</small></div>`;
+    document.getElementById(tabId).innerHTML = `<div class="state-box">❌ Laden mislukt voor <strong>${poule.name}</strong>.<br><small>${e.message}</small></div>`;
   }
 }
 
 async function loadFinales() {
+  const tabId = 'tab-' + POULES.length;
   if (!FINALES_URL || FINALES_URL.startsWith('PASTE_')) {
-    document.getElementById('tab-2').innerHTML = `<div class="state-box">⚙️ Voeg de CSV-URL in voor de Finales.</div>`;
+    document.getElementById(tabId).innerHTML = `<div class="state-box">⚙️ Voeg de CSV-URL in voor de Finales.</div>`;
     return;
   }
   try {
     const matches = await fetchCSV(FINALES_URL);
     if (!matches.length) throw new Error('Geen rijen gevonden — controleer de kolomnamen');
-    document.getElementById('tab-2').innerHTML = buildFinalesPanel(matches);
+    document.getElementById(tabId).innerHTML = buildFinalesPanel(matches);
   } catch (e) {
-    document.getElementById('tab-2').innerHTML = `<div class="state-box">❌ Laden mislukt voor <strong>Finales</strong>.<br><small>${e.message}</small></div>`;
+    document.getElementById(tabId).innerHTML = `<div class="state-box">❌ Laden mislukt voor <strong>Finales</strong>.<br><small>${e.message}</small></div>`;
   }
 }
 
@@ -395,8 +428,7 @@ async function loadAll() {
   document.getElementById('refresh-dot').classList.remove('live');
   document.getElementById('refresh-status').textContent = 'Laden...';
   await Promise.all([
-    loadPoule('tab-0', POULE_A_URL, 'Poule A'),
-    loadPoule('tab-1', POULE_B_URL, 'Poule B'),
+    ...POULES.map((p, i) => loadPoule(i, p)),
     loadFinales()
   ]);
   const now = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
